@@ -1,0 +1,50 @@
+name: Build Brazilix DEB
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git perl make clang ldid build-essential curl xz-utils
+
+      - name: Setup Theos
+        run: |
+          git clone --recursive https://github.com/theos/theos.git ~/theos
+          echo "THEOS=~/theos" >> $GITHUB_ENV
+
+      - name: Setup iOS SDK
+        run: |
+          mkdir -p ~/theos/sdks
+          curl -L https://github.com/theos/sdks/archive/master.zip -o ~/theos/sdks/sdks.zip
+          unzip -q ~/theos/sdks/sdks.zip -d ~/theos/sdks/
+          mv ~/theos/sdks/sdks-master/iPhoneOS14.5.sdk ~/theos/sdks/
+          rm -rf ~/theos/sdks/sdks-master ~/theos/sdks/sdks.zip
+
+      - name: Setup Toolchain
+        run: |
+          mkdir -p ~/theos/toolchain/linux/iphone/bin
+          ln -s /usr/bin/clang ~/theos/toolchain/linux/iphone/bin/clang
+          ln -s /usr/bin/clang++ ~/theos/toolchain/linux/iphone/bin/clang++
+          ln -s /usr/bin/ldid ~/theos/toolchain/linux/iphone/bin/ldid
+
+      - name: Build Package
+        run: |
+          export THEOS=~/theos
+          make package FINALPACKAGE=1
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Brazilix-DEB
+          path: packages/*.deb
